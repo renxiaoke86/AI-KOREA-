@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한국어 발음 학습</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background:#f6f7fb; margin:0; color:#222; }
+header { background:#2b3a67; color:#fff; padding:18px; position:sticky; top:0; z-index:10; }
+header h1 { margin:0 0 10px; font-size:18px; }
+nav { display:flex; gap:8px; flex-wrap:wrap; }
+.tab-btn { background:rgba(255,255,255,.15); color:#fff; border:none; padding:9px 14px; border-radius:8px; font-size:13px; cursor:pointer; }
+.tab-btn.active { background:#f6a821; color:#222; font-weight:bold; }
+main { max-width:520px; margin:20px auto; padding:0 16px 60px; }
+.card { background:#fff; padding:18px; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:16px; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+label { display:block; font-size:14px; margin-bottom:12px; }
+input, select, textarea { width:100%; padding:8px; margin-top:4px; border:1px solid #ccc; border-radius:6px; font-size:14px; font-family:inherit; }
+button { background:#2b3a67; color:#fff; border:none; padding:10px 16px; border-radius:6px; font-size:14px; cursor:pointer; margin-top:6px; }
+button:disabled { background:#aaa; }
+button.active { background:#f6a821; color:#222; }
+.hidden { display:none !important; }
+.hint { color:#666; font-size:13px; }
+.warn { color:#c0392b; font-size:13px; }
+.result-box { margin-top:14px; padding:12px; background:#f0f3ff; border-radius:8px; font-size:14px; }
+.speed-controls button, .record-controls button { margin-right:8px; }
+audio { width:100%; margin:10px 0; }
+.reference-text { background:#fffbe8; padding:14px; border-radius:6px; font-size:17px; line-height:1.9; }
+.word-span { transition: color .15s, background .15s; padding:1px 2px; border-radius:3px; }
+.word-active { background:#2b3a67; color:#fff; font-weight:bold; }
+.word-chip { display:inline-block; padding:4px 8px; margin:3px; border-radius:6px; font-size:13px; }
+.word-good { background:#d9f2d9; } .word-bad { background:#fbd6d6; } .word-ok { background:#fff3cf; }
+.item-card { border:1px solid #ddd; border-radius:8px; padding:10px 14px; margin:8px 0; display:flex; justify-content:space-between; align-items:center; }
+.item-card.done { border-color:#8fce8f; background:#f4fbf4; }
+table { width:100%; border-collapse:collapse; margin-top:10px; }
+th, td { border-bottom:1px solid #eee; padding:8px; text-align:left; font-size:14px; }
+.score-week-row { display:flex; align-items:center; gap:10px; margin:6px 0; }
+.score-bar-bg { flex:1; background:#eee; border-radius:4px; overflow:hidden; height:14px; }
+.score-bar-fill { height:100%; background:#2b3a67; }
+.qr-box { text-align:center; margin-top:10px; }
+.qr-box img { border:8px solid #fff; box-shadow:0 1px 6px rgba(0,0,0,.15); border-radius:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🇰🇷 한국어 듣기·발음 연습</h1>
+  <nav>
+    <button class="tab-btn active" data-tab="teacher">교사</button>
+    <button class="tab-btn" data-tab="student">학생</button>
+    <button class="tab-btn" data-tab="scores">성적</button>
+  </nav>
+</header>
+<main>
+
+  <!-- 교사 -->
+  <section id="tab-teacher" class="tab-panel active">
+    <div class="card">
+      <h2>학생용 QR코드</h2>
+      <p class="hint">프로젝터에 이 QR코드를 띄우면 학생들이 스캔해서 바로 들어올 수 있습니다.</p>
+      <div class="qr-box">
+        <img id="qrImg" width="220" height="220">
+      </div>
+      <p class="hint" id="siteUrlText" style="word-break:break-all;"></p>
+    </div>
+
+    <div class="card">
+      <h2>이번 주 문제 업로드</h2>
+      <p class="hint">한 주에 여러 문제를 올릴 수 있습니다 (예: 1주차에 15개). 긴 오디오는 자동으로 조각내서 처리됩니다.</p>
+      <form id="lessonForm">
+        <label>주차 (1~10) <input type="number" id="week" min="1" max="10" required></label>
+        <label>문제 제목 <input type="text" id="title" placeholder="예: 1번 문제 - 자기소개"></label>
+        <label>오디오 파일 (mp3/wav) <input type="file" id="audioFile" accept="audio/*" required></label>
+        <label>정확한 텍스트 <textarea id="refText" rows="3" required placeholder="오디오와 정확히 일치하는 한국어 텍스트"></textarea></label>
+        <button type="submit" id="uploadBtn">업로드</button>
+      </form>
+      <div id="lessonResult" class="result-box hidden"></div>
+    </div>
+  </section>
+
+  <!-- 학생 -->
+  <section id="tab-student" class="tab-panel">
+    <div class="card" id="setupCard">
+      <label>학번/이름 <input type="text" id="studentId" placeholder="학번 또는 이름"></label>
+      <label>주차
+        <select id="weekSelect">
+          <option value="">주차 선택</option>
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+          <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+        </select>
+      </label>
+      <button id="loadLessonsBtn">문제 목록 불러오기</button>
+      <div id="lessonList"></div>
+    </div>
+
+    <div class="card hidden" id="practiceArea">
+      <button id="backToListBtn" style="background:#888;">← 목록으로</button>
+      <h3 id="lessonTitle"></h3>
+      <p class="reference-text" id="referenceText"></p>
+      <audio id="refAudio" controls></audio>
+      <div class="speed-controls">
+        속도:
+        <button data-rate="0.7">느리게 0.7x</button>
+        <button data-rate="1.0" class="active">보통 1.0x</button>
+        <button data-rate="1.3">빠르게 1.3x</button>
+      </div>
+      <div class="record-controls">
+        <button id="recordBtn">🎙️ 녹음 시작</button>
+        <button id="stopBtn" disabled>⏹️ 녹음 종료</button>
+        <audio id="myAudio" controls class="hidden"></audio>
+      </div>
+      <button id="submitBtn" disabled>제출하고 채점받기</button>
+      <div id="scoreResult" class="result-box hidden"></div>
+      <button id="nextItemBtn" class="hidden">다음 문제 →</button>
+    </div>
+  </section>
+
+  <!-- 성적 -->
+  <section id="tab-scores" class="tab-panel">
+    <div class="card">
+      <h2>내 성적 조회</h2>
+      <label>학번/이름 <input type="text" id="scoreStudentId"></label>
+      <button id="loadScoreBtn">조회</button>
+      <div id="studentScoreBox"></div>
+    </div>
+    <div class="card">
+      <h2>전체 학생 현황 (교사용)</h2>
+      <table id="overviewTable">
+        <thead><tr><th>학생</th><th>완료 주차</th><th>기말 예상</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ⚠️ Apps Script 배포 후 나온 웹앱 URL (.../exec) 을 여기에 붙여넣으세요
+const APPS_SCRIPT_URL = 'PUT_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+// ---------- 탭 전환 ----------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- QR 코드 ----------
+(function initQr() {
+  const url = location.href.split('#')[0];
+  document.getElementById('siteUrlText').textContent = url;
+  document.getElementById('qrImg').src =
+    'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(url);
+})();
+
+// ---------- 백엔드 호출 ----------
+async function callBackend(action, payload) {
+  const resp = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action }, payload))
+  });
+  const json = await resp.json();
+  if (!json.ok) throw new Error(json.error || '요청 실패');
+  return json.data;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- 교사: 업로드 ----------
+document.getElementById('lessonForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const box = document.getElementById('lessonResult');
+  const btn = document.getElementById('uploadBtn');
+  const fileInput = document.getElementById('audioFile');
+  if (!fileInput.files[0]) { alert('오디오 파일을 선택하세요.'); return; }
+
+  box.classList.remove('hidden');
+  box.textContent = '업로드 및 타이밍 분석 중... (몇 초 걸릴 수 있어요)';
+  btn.disabled = true;
+
+  try {
+    const file = fileInput.files[0];
+    const text = document.getElementById('refText').value;
+    const base64 = await fileToBase64(file);
+    box.textContent = '오디오 분할 중...';
+    const chunks = await chunkAudioAndText(file, text);
+    box.textContent = `업로드 및 타이밍 분석 중... (${chunks.length}개 조각)`;
+    const lesson = await callBackend('uploadLesson', {
+      base64Audio: base64,
+      fileName: file.name,
+      mimeType: file.type,
+      week: document.getElementById('week').value,
+      title: document.getElementById('title').value,
+      text: text,
+      chunks: chunks
+    });
+    box.innerHTML = `<b>업로드 완료!</b><br>제목: ${lesson.title}<br>` +
+      (lesson.timingAvailable ? '✅ 단어별 하이라이트 타이밍 추출 성공' : '⚠️ 타이밍 추출 실패 (하이라이트 없이 재생만 가능. 음질이 너무 낮거나 무음이 많으면 발생할 수 있음)');
+    document.getElementById('lessonForm').reset();
+  } catch (err) {
+    box.textContent = '오류: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- 학생: 문제 목록 ----------
+let weekItems = [];
+let currentIndex = -1;
+
+document.getElementById('loadLessonsBtn').addEventListener('click', async () => {
+  const week = document.getElementById('weekSelect').value;
+  const listBox = document.getElementById('lessonList');
+  if (!week) { listBox.textContent = '주차를 선택하세요.'; return; }
+  listBox.textContent = '불러오는 중...';
+  try {
+    weekItems = await callBackend('getLessons', { week });
+    if (!weekItems.length) { listBox.textContent = '이번 주 문제가 아직 없습니다.'; return; }
+    renderLessonList();
+  } catch (err) {
+    listBox.textContent = '오류: ' + err.message;
+  }
+});
+
+function renderLessonList() {
+  const listBox = document.getElementById('lessonList');
+  listBox.innerHTML = `<p class="hint">총 ${weekItems.length}개 문제</p>`;
+  weekItems.forEach((lesson, idx) => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `<span>${idx + 1}. ${lesson.title}</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = '풀기';
+    btn.onclick = () => openItem(idx);
+    card.appendChild(btn);
+    listBox.appendChild(card);
+  });
+}
+
+document.getElementById('backToListBtn').addEventListener('click', () => {
+  document.getElementById('practiceArea').classList.add('hidden');
+  document.getElementById('setupCard').classList.remove('hidden');
+});
+
+function openItem(idx) {
+  currentIndex = idx;
+  const lesson = weekItems[idx];
+  document.getElementById('setupCard').classList.add('hidden');
+  document.getElementById('practiceArea').classList.remove('hidden');
+  document.getElementById('lessonTitle').textContent = `${idx + 1}. ${lesson.title}`;
+
+  const refTextEl = document.getElementById('referenceText');
+  if (lesson.wordTimings && lesson.wordTimings.length) {
+    refTextEl.innerHTML = lesson.wordTimings.map((w, i) =>
+      `<span class="word-span" data-start="${w.offsetMs}" data-end="${w.offsetMs + w.durationMs}">${w.word}</span>`
+    ).join(' ');
+  } else {
+    refTextEl.textContent = lesson.referenceText;
+  }
+
+  const audioEl = document.getElementById('refAudio');
+  audioEl.src = lesson.audioUrl;
+  audioEl.playbackRate = 1.0;
+  audioEl.ontimeupdate = () => highlightWords(audioEl.currentTime * 1000);
+
+  document.getElementById('scoreResult').classList.add('hidden');
+  document.getElementById('nextItemBtn').classList.add('hidden');
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('myAudio').classList.add('hidden');
+  recordedBlob = null;
+}
+
+function highlightWords(currentMs) {
+  document.querySelectorAll('.word-span').forEach(span => {
+    const start = Number(span.dataset.start), end = Number(span.dataset.end);
+    if (currentMs >= start && currentMs <= end) span.classList.add('word-active');
+    else span.classList.remove('word-active');
+  });
+}
+
+document.querySelectorAll('.speed-controls button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-controls button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('refAudio').playbackRate = parseFloat(btn.dataset.rate);
+  });
+});
+
+document.getElementById('nextItemBtn').addEventListener('click', () => {
+  if (currentIndex + 1 < weekItems.length) openItem(currentIndex + 1);
+  else { document.getElementById('backToListBtn').click(); renderLessonList(); }
+});
+
+// ---------- 녹음 ----------
+let mediaRecorder, recordedChunks = [], recordedBlob = null;
+
+document.getElementById('recordBtn').addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+      const myAudio = document.getElementById('myAudio');
+      myAudio.src = URL.createObjectURL(recordedBlob);
+      myAudio.classList.remove('hidden');
+      document.getElementById('submitBtn').disabled = false;
+      stream.getTracks().forEach(t => t.stop());
+    };
+    mediaRecorder.start();
+    document.getElementById('recordBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+  } catch (err) {
+    alert('마이크 접근에 실패했습니다: ' + err.message);
+  }
+});
+
+document.getElementById('stopBtn').addEventListener('click', () => {
+  mediaRecorder.stop();
+  document.getElementById('recordBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+});
+
+// ---------- WAV 변환 (단어별 인코딩은 아래 encodeWavPCM16_ 재사용) ----------
+function encodeWavPCM16_(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  function ws(o, s) { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0,'RIFF'); view.setUint32(4, 36 + samples.length*2, true); ws(8,'WAVE'); ws(12,'fmt ');
+  view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,1,true);
+  view.setUint32(24,sampleRate,true); view.setUint32(28,sampleRate*2,true);
+  view.setUint16(32,2,true); view.setUint16(34,16,true); ws(36,'data');
+  view.setUint32(40, samples.length*2, true);
+  let offset = 44;
+  for (let i=0;i<samples.length;i++,offset+=2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s<0 ? s*0x8000 : s*0x7fff, true);
+  }
+  return new Blob([view], { type: 'audio/wav' });
+}
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ---------- 긴 오디오를 25초 이하 조각으로 자동 분할 (Azure 30초 제한 우회) ----------
+// 한국어는 어절(띄어쓰기) 단위로 되어 있으므로, 오디오 시간 비율에 맞춰 텍스트도 함께 나눔.
+const MAX_CHUNK_SEC = 25;
+
+async function decodeToAudioBuffer(blob) {
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return await audioCtx.decodeAudioData(arrayBuffer);
+}
+
+async function sliceToWav16kMono(audioBuffer, startSec, durSec, targetRate = 16000) {
+  const offlineCtx = new OfflineAudioContext(1, Math.max(1, Math.ceil(durSec * targetRate)), targetRate);
+  const source = offlineCtx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(offlineCtx.destination);
+  source.start(0, startSec, durSec);
+  const rendered = await offlineCtx.startRendering();
+  return encodeWavPCM16_(rendered.getChannelData(0), targetRate);
+}
+
+async function chunkAudioAndText(blob, text) {
+  const buffer = await decodeToAudioBuffer(blob);
+  const total = buffer.duration;
+  const numChunks = Math.max(1, Math.ceil(total / MAX_CHUNK_SEC));
+  const chunkDur = total / numChunks;
+
+  // 한국어는 띄어쓰기로 어절이 구분되어 있어서, 어절 개수를 오디오 조각 수만큼 비례 분배
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const wordsPerChunk = Math.max(1, Math.ceil(words.length / numChunks));
+
+  const chunks = [];
+  for (let i = 0; i < numChunks; i++) {
+    const startSec = i * chunkDur;
+    const durSec = (i === numChunks - 1) ? (total - startSec) : chunkDur;
+    const wavBlob = await sliceToWav16kMono(buffer, startSec, durSec);
+    const base64Wav = await blobToBase64(wavBlob);
+    const textSlice = words.slice(i * wordsPerChunk, (i + 1) * wordsPerChunk).join(' ') || text;
+    chunks.push({ base64Wav, text: textSlice, startSec, durSec });
+  }
+  return chunks;
+}
+
+// ---------- 제출 ----------
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const studentId = document.getElementById('studentId').value.trim();
+  if (!studentId) { alert('학번/이름을 입력하세요.'); return; }
+  if (currentIndex < 0 || !recordedBlob) { alert('먼저 녹음하세요.'); return; }
+
+  const box = document.getElementById('scoreResult');
+  const submitBtn = document.getElementById('submitBtn');
+  box.classList.remove('hidden');
+  box.textContent = 'WAV 변환 중...';
+  submitBtn.disabled = true;
+
+  try {
+    box.textContent = '녹음 분할 중...';
+    const lesson = weekItems[currentIndex];
+    const chunks = await chunkAudioAndText(recordedBlob, lesson.referenceText);
+    box.textContent = `채점 중... (${chunks.length}개 조각, Azure 발음평가 호출)`;
+    const data = await callBackend('submitRecording', {
+      chunks, studentId, studentName: studentId, lessonId: lesson.lessonId
+    });
+    renderScore(data, box);
+    document.getElementById('nextItemBtn').classList.remove('hidden');
+  } catch (err) {
+    box.textContent = '오류: ' + err.message;
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+function renderScore(data, box) {
+  const words = (data.words || []).map(w => {
+    const cls = w.errorType && w.errorType !== 'None' ? 'word-bad'
+      : (w.accuracyScore != null && w.accuracyScore < 70 ? 'word-ok' : 'word-good');
+    return `<span class="word-chip ${cls}">${w.word} (${w.accuracyScore ?? '-'})</span>`;
+  }).join('');
+  box.innerHTML = `
+    <b>종합 점수: ${data.pronScore ?? '-'} / 100</b><br>
+    정확도: ${data.accuracyScore ?? '-'} &nbsp; 유창성: ${data.fluencyScore ?? '-'} &nbsp;
+    완성도: ${data.completenessScore ?? '-'} &nbsp; 억양: ${data.prosodyScore ?? '-'}
+    <div style="margin-top:10px;">${words}</div>
+  `;
+}
+
+// ---------- 성적 조회 ----------
+document.getElementById('loadScoreBtn').addEventListener('click', async () => {
+  const id = document.getElementById('scoreStudentId').value.trim();
+  if (!id) return;
+  const box = document.getElementById('studentScoreBox');
+  box.textContent = '불러오는 중...';
+  try {
+    const data = await callBackend('getScores', { studentId: id });
+    if (!data.weeklyBest.length) { box.innerHTML = '<p class="hint">아직 제출 기록이 없습니다.</p>'; return; }
+    const rows = data.weeklyBest.map(w => `
+      <div class="score-week-row">
+        <span style="width:60px;">Week ${w.week}</span>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${w.pronScore || 0}%"></div></div>
+        <span style="width:40px;">${w.pronScore ?? '-'}</span>
+        <span class="hint" style="width:50px;">${w.itemsCompleted}/${w.totalItems}</span>
+      </div>`).join('');
+    box.innerHTML = `<p>완료 주차: ${data.weeksCompleted} / 10</p>${rows}
+      <p><b>${data.weeksCompleted >= 10 ? '기말 성적' : '현재까지 평균(예상 기말)'}: ${data.finalScore ?? '-'}</b></p>`;
+  } catch (err) {
+    box.textContent = '오류: ' + err.message;
+  }
+});
+
+async function loadOverview() {
+  try {
+    const list = await callBackend('getOverview', {});
+    document.querySelector('#overviewTable tbody').innerHTML = list.map(s => `
+      <tr><td>${s.studentName}</td><td>${s.weeksCompleted}/10</td><td>${s.finalScore ?? '-'}</td></tr>
+    `).join('');
+  } catch (err) { /* 조용히 무시 */ }
+}
+loadOverview();
+</script>
+</body>
+</html>
