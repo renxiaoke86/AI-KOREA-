@@ -137,7 +137,7 @@ th, td { border-bottom:1px solid #eee; padding:8px; text-align:left; font-size:1
 
 <script>
 // ⚠️ Apps Script 배포 후 나온 웹앱 URL (.../exec) 을 여기에 붙여넣으세요
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweh_psPibMeil3e-IGxQgR_l6waEga48i8j5hF6HJFYlztSo3V49e7TdqnrAbKXFpG/exec';
+const APPS_SCRIPT_URL = 'PUT_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
 
 // ---------- 탭 전환 ----------
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -159,10 +159,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ---------- 백엔드 호출 ----------
 async function callBackend(action, payload) {
+  const body = new URLSearchParams();
+  body.set('payload', JSON.stringify(Object.assign({ action }, payload)));
   const resp = await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ action }, payload))
+    body: body // 브라우저가 자동으로 application/x-www-form-urlencoded; UTF-8로 인코딩해줌
   });
   const json = await resp.json();
   if (!json.ok) throw new Error(json.error || '요청 실패');
